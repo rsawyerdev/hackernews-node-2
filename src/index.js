@@ -1,18 +1,21 @@
 const { GraphQLServer } = require('graphql-yoga')
+const { prisma } = require('./generated/prisma-client')
 
-// 1
-const typeDefs = `
-type Query {
-  info: String!
-  feed: [Link!]!
+async function main() {
+
+  // Create a new link
+  const newLink = await prisma.createLink({ 
+    url: 'www.prisma.io',
+    description: 'Prisma replaces traditional ORMs',
+  })
+  console.log(`Created new link: ${newLink.url} (ID: ${newLink.id})`)
+
+  // Read all links from the database and print them to the console
+  const allLinks = await prisma.links()
+  console.log(allLinks)
 }
 
-type Link {
-    id: ID!
-    description: String!
-    url: String!
-}
-`
+main().catch(e => console.error(e))
 
 let links = [{
     id: 'link-0',
@@ -20,22 +23,34 @@ let links = [{
     description: 'Fullstack tutorial for GraphQL'
   }]
 
-// 2
+let idCount = links.length
+
 const resolvers = {
   Query: {
     info: () => `This is the API of a Hackernews Clone`,
-    feed: () => links,
+    feed: (root, args, context, info) => {
+        return context.prisma.links()
+    },
   },
-  Link: {
+  Mutation: {
+    post: (root, args, context) => {
+        return context.prisma.createLink({
+            url: args.url,
+            description: args.description
+        })
+    }
+  },
+/*  Link: {
       id: (parent) => parent.id,
       description: (parent) => parent.description,
       url: (parent) => parent.url,
-  }
+  }*/
 }
 
 // 3
 const server = new GraphQLServer({
-  typeDefs,
+  typeDefs: './src/schema.graphql',
   resolvers,
+  context: { prisma }
 })
 server.start(() => console.log(`Server is running on http://localhost:4000`))
